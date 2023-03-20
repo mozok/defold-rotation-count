@@ -1,0 +1,22 @@
+local camera = require "orthographic.camera"
+
+local CAMERA_ID = hash("/camera")
+
+function init(self)
+	self.crosshair = vmath.vector3()
+	msg.post(".", "acquire_input_focus")
+end
+
+function final(self)
+	msg.post(".", "release_input_focus")
+end
+
+function update(self, dt)
+	local cursor_pos = camera.screen_to_world(CAMERA_ID, self.crosshair)
+	go.set_position(cursor_pos)
+end
+
+function on_input(self, action_id, action)
+	self.crosshair.x = action.x
+	self.crosshair.y = action.y
+end
