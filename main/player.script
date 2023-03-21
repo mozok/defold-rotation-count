@@ -16,6 +16,7 @@ function final(self)
 	msg.post(".", "release_input_focus")
 end
 
+-- old realisation
 local function process_rotation(self, target_rotation, target_angle)
 	-- get rotation direction from quaternions
 	local current_rotation_z = math.floor(go.get_rotation().z * 10000)
@@ -79,6 +80,7 @@ local function process_rotation(self, target_rotation, target_angle)
 	end
 end
 
+-- new (current) realisation
 local function process_rotation2(self, dt)
 	local crosshair_world = go.get_world_position("target")
 	local player_world = go.get_world_position()
