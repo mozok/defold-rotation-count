@@ -1,10 +1,11 @@
 -- movement speed
 local SPEED = 20
+local ROTATION_SPEED = 100
 
 function init(self)
 	self.input = {}
 	self.turn_count = 0
-	self.rotation_direction = 0 -- 1 - clockwise, -1 - counterclockwise
+	self.rotation_direction = 0 -- -1 - clockwise, 1 - counterclockwise
 	self.previous_direction = 0
 	self.accumulated_rotation = 0
 	msg.post(".", "acquire_input_focus")
@@ -78,8 +79,74 @@ local function process_rotation(self, target_rotation, target_angle)
 	end
 end
 
+local function process_rotation2(self, dt)
+	local crosshair_world = go.get_world_position("target")
+	local player_world = go.get_world_position()
+	local target_angle = math.atan2(player_world.x - crosshair_world.x, crosshair_world.y - player_world.y) * 180/3.14159
+
+	local current_angle = go.get(".", "euler.z")
+
+	-- normalize to 0-360 degree
+	if target_angle < 0 then
+		target_angle = 360 + target_angle
+	end
+
+	-- get rotation dirrection
+	if math.floor(current_angle) == math.floor(target_angle) then
+		self.rotation_direction = 0
+	else
+		local delta_angle = target_angle - current_angle
+		if delta_angle > 180 then
+			delta_angle = delta_angle - 360
+		elseif delta_angle <= -180 then
+			delta_angle = delta_angle + 360
+		end
+
+		-- fluctuation when moving
+		if math.abs(delta_angle) < 2 then
+			return
+		end
+
+		if delta_angle > 0 then
+			self.rotation_direction = 1
+		elseif delta_angle < 0 then
+			self.rotation_direction = -1
+		end
+	end
+
+	-- stop processing if we are not rotating
+	if self.rotation_direction == 0 then
+		return
+	end
+
+	if self.rotation_direction ~= self.previous_direction then
+		self.accumulated_rotation = 0
+		self.previous_direction = self.rotation_direction 
+	end
+
+	local rotation_amount = ROTATION_SPEED * dt
+
+	if self.input[hash('touch')] then
+		-- add the amount of rotation to accumulated rotation
+		self.accumulated_rotation = self.accumulated_rotation + rotation_amount
+		-- have we rotated a full turn?
+		if self.accumulated_rotation > 360 then
+			self.accumulated_rotation = self.accumulated_rotation - 360
+			self.turn_count = self.turn_count + 1
+			msg.post('/hud#hud', "turns", {turns = self.turn_count}) -- for debug
+		end
+	else
+		-- self.rotation_direction = 0
+		self.accumulated_rotation = 0
+	end
+
+	self.angle = (current_angle + rotation_amount * self.rotation_direction) % 360
+	go.set(".", "euler.z", self.angle)
+end
+
+
 function update(self, dt)
-	msg.post("@render:", "draw_text", { text = "Arrows or WASD to move/turn. Mouse to turn. Left mouse button to start rotation count. \nCode breaks down when you move and rotate :(", position = vmath.vector3(20, 40, 0) } )
+	msg.post("@render:", "draw_text", { text = "Arrows or WASD to move/turn. Mouse to turn. Left mouse button to start rotation count.", position = vmath.vector3(20, 20, 0) } )
 
 	-- update player position
 	local pos = go.get_position()
@@ -97,20 +164,21 @@ function update(self, dt)
 	go.set_position(pos)
 	
 	-- rotate towards cursor
-	local crosshair_world = go.get_world_position("target")
-	local player_world = go.get_world_position()
-	local angle = math.atan2(player_world.x - crosshair_world.x, crosshair_world.y - player_world.y)
-	local rotation = vmath.quat_rotation_z(angle)
+	-- local crosshair_world = go.get_world_position("target")
+	-- local player_world = go.get_world_position()
+	-- local angle = math.atan2(player_world.x - crosshair_world.x, crosshair_world.y - player_world.y)
+	-- local rotation = vmath.quat_rotation_z(angle)
 
 	-- process rotation count
-	if self.input[hash('touch')] then
-		process_rotation(self, rotation, angle)
-	else
-		self.rotation_direction = 0
-		self.accumulated_rotation = 0
-	end
+	-- if self.input[hash('touch')] then
+		-- process_rotation(self, rotation, angle)
+	-- else
+		-- self.rotation_direction = 0
+		-- self.accumulated_rotation = 0
+	-- end
 	
-	go.set_rotation(rotation)
+	-- go.set_rotation(rotation)
+	process_rotation2(self, dt)
 end
 
 function on_input(self, action_id, action)
